@@ -10,7 +10,7 @@ services:
       ORACLE_PWD: ${DB_ROOT_PASSWORD:-password}
       ORACLE_CHARACTERSET: ${DB_CHARSET:-AL32UTF8}
     volumes:
-      - ./sql:/docker-entrypoint-initdb.d/startup
+      - ./sql-init:/docker-entrypoint-initdb.d/startup
     ports:
       - ${DB_PORT:-1521}:1521
       - ${EM_PORT:-5500}:5500
