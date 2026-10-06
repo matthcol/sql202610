@@ -1,4 +1,9 @@
-CONN umovie/password@localhost/xepdb1
+set termout off
+column pdb_name new_value pdb_name
+SELECT name AS pdb_name FROM v$pdbs WHERE name != 'PDB$SEED';
+set termout on
+
+CONN umovie/password@localhost/&pdb_name
 
 set define off
 set autocommit on
