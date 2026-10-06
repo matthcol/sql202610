@@ -1,0 +1,18 @@
+services:
+
+  db:
+    build:
+      context: ${ORACLE_VERSION:-21.3.0}
+      dockerfile: ${ORACLE_DOCKERFILE:-Dockerfile.xe}
+    image: oracle/database:${ORACLE_VERSION:-21.3.0}-${ORACLE_EDITION_SUFFIX:-xe}
+    restart: unless-stopped
+    environment:
+      ORACLE_PWD: ${DB_ROOT_PASSWORD:-password}
+      ORACLE_CHARACTERSET: ${DB_CHARSET:-AL32UTF8}
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d/startup
+    ports:
+      - ${DB_PORT:-1521}:1521
+      - ${EM_PORT:-5500}:5500
+
+  
