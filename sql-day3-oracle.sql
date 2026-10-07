@@ -406,6 +406,398 @@ create view v_actor_stats as (
 select * from V_DIRECTOR_STATS order by nb_movie desc;
 select * from V_ACTOR_STATS order by nb_movie desc;
 
+ with selection_person as (
+    select *
+    from person
+    where name in (
+        'Clint Eastwood',
+        'Steve McQueen',
+        'Harrison Ford',
+        'Quentin Tarantino',
+        'Leonardo DiCaprio',
+        'Zoe Saldana',
+        'Anne Hathaway',
+        'Alfred Hitchcock',
+        'Christopher Nolan'
+    )
+)
+select 
+    pe.id as person_id,
+    pe.name,
+    coalesce(dst.nb_movie, 0) as nb_movie_director,
+    coalesce(ast.nb_movie, 0) as nb_movie_actor
+from
+    selection_person pe
+    left join V_DIRECTOR_STATS dst on pe.id = dst.id
+    left join V_ACTOR_STATS ast on pe.id = ast.id
+;
+
+-- projection : colonne à valeur conditionnelle
+-- * COALESCE : cf exemple précédente
+-- * CASE
+-- * NULLIF
+
+select
+    m.title,
+    m.year,
+    m.duration,
+    case 
+        when m.DURATION < 60 then 'COURT_METRAGE'
+        when m.duration < 120 then 'MOYEN_METRAGE'
+        when m.duration >= 120 then 'LONG_METRAGE'
+        else 'NC'
+    end as classification
+from movie m
+where 
+    m.duration is null
+    or m.year in (1920, 1954, 1984, 2026)
+order by m.duration
+;
+
+
+select
+    m.title,
+    m.year,
+    m.duration,
+    case floor(m.year / 10)
+        when 197 then '70s'
+        when 198 then '80s'
+        when 199 then '90s'
+    end as decade
+from movie m
+where m.year between 1970 and 1999
+order by m.year, m.title
+;
+
+select distinct pg from movie;
+select distinct year from movie;
+
+
+select
+    m.title,
+    m.year,
+    nullif(m.year, 1975) as year_masked
+from movie m
+where m.year between 1970 and 1979
+order by m.year
+;
+
+-- sous-requete
+select *
+from person pe
+where pe.id in (
+    select distinct pl.ACTOR_ID
+    from play pl
+    where lower(pl.role) like '%james bond%'
+)
+;
+
+-- meme chose que :
+select *
+from person pe
+where pe.id in (
+    125,799689,1355486,184092,493872,549,1096,185819,112
+);
+
+-- Q1. les personnes qui sont acteur
+select *
+from person pe
+where pe.id in (
+    select actor_id
+    from play
+);
+-- Q2. les personnes qui sont réalisateur
+select *
+from person pe
+where pe.id in (
+    select director_id
+    from movie
+);
+-- Q3. les personnes qui sont acteur et réalisateur
+select *
+from person pe
+where 
+    pe.id in (
+        select actor_id
+        from play
+    )
+    and pe.id in (
+        select director_id
+        from movie
+    )
+;
+
+-- idem avec operateur ensembliste
+select *
+from person pe
+where 
+    pe.id in (
+        select actor_id
+        from play
+        INTERSECT
+        select director_id
+        from movie
+        where director_id is not null
+    )
+;
+-- Q4. les personnes qui sont que acteur (pas realisateur)
+select *
+from person pe
+where 
+    pe.id in (
+        select actor_id
+        from play
+    )
+    and 
+    pe.id not in (
+        select director_id  -- peut etre absent
+        from movie
+        where director_id is not null
+    )
+    and pe.name like 'Cli%'
+order by pe.name
+;
+
+select *
+from person pe
+where 
+    pe.id in (
+        select actor_id
+        from play
+        MINUS
+        select director_id
+        from movie
+        where director_id is not null
+    )
+;
+-- Q5. les personnes qui sont que réalisateur (pas acteur)
+select *
+from person pe
+where 
+    pe.id not in (
+        select actor_id   -- toujours present
+        from play
+    )
+    and pe.id in (
+        select director_id
+        from movie
+    )
+order by pe.name
+;
+
+select *
+from person pe
+where 
+    pe.id in (
+        select director_id
+        from movie
+        where director_id is not null
+        MINUS
+        select actor_id
+        from play
+    )
+;
+
+-- Q6. les personnes qui sont ni acteur ni realisateur
+select *
+from person pe
+where 
+    pe.id not in (
+        select actor_id
+        from play
+    )
+    and 
+    pe.id not in (
+        select director_id  -- peut etre absent
+        from movie
+        where director_id is not null
+    )
+and pe.name like 'J%'
+order by pe.name
+;
+
+select *
+from person pe
+where 
+    pe.id not in (
+        select director_id
+        from movie
+        where director_id is not null
+        UNION
+        select actor_id
+        from play
+    )
+    and pe.name like 'J%'
+order by pe.name
+;
+
+-- enquete sur
+-- 136 Johnny Depp
+-- 945 Jane Birkin
+-- 675 Jeanne Tripplehorn
+
+select * from play where actor_id in (136, 945, 675);
+
+delete from person where id = 136;  -- ok car non referencé
+-- delete from person where id = 142;  -- ko car referencé dans movie et play
+-- delete from person where id = 634240; -- ko car referencé dans movie 
+
+
+select 
+    'movie' as table_name,
+    count(*) as nb_rows
+from movie
+UNION
+select 
+    'person' as table_name,
+    count(*) as nb_rows
+from person
+UNION
+select 
+    'play' as table_name,
+    count(*) as nb_rows
+from play
+UNION
+select 
+    'have_genre' as table_name,
+    count(*) as nb_rows
+from have_genre
+;
+
+-- Note: UNION ALL si doublons que l'on souhaite garder
+
+
+-- acteurs ayant collaboré avec les realisateurs Clint Eastwood, Steven Spielberg (ds quel film)
+
+
+select 
+    actor.name as actor_name,
+    m.year,
+    m.title,
+    director.name as director_name
+from
+    person actor
+    join play pl on actor.id = pl.actor_id
+    join movie m on pl.movie_id = m.id
+    join person director on m.director_id = director.id
+where
+    director.name in (
+        'Clint Eastwood',
+        'Steven Spielberg'
+    )
+order by actor.name, director.name, m.year
+;
+
+
+-- division = TOUS
+
+-- réalisateurs :  Clint Eastwood, Steven Spielberg, Quentin Tarantino, Martin Scorsese
+-- Qui a joué pour TOUS ces réalisateurs
+
+-- solution 1 = on compte
+-- step 1 : on relie les tables
+with director_selection as (
+    select *
+    from person
+    where name in (
+        'Clint Eastwood',
+        'Steven Spielberg',
+        'Quentin Tarantino', 
+        'Martin Scorsese'
+    )
+)
+select
+    actor.name,
+    m.title,
+    d.name
+from 
+    person actor 
+    join play pl on actor.id = pl.actor_id
+    join movie m on pl.movie_id = m.id
+    join director_selection d on m.director_id = d.id
+;
+-- on compte
+with director_selection as (
+    select *
+    from person
+    where name in (
+        'Clint Eastwood',
+        'Steven Spielberg',
+        'Quentin Tarantino', 
+        'Martin Scorsese'
+    )
+)
+select
+    actor.id,
+    actor.name,
+    count(distinct d.id) as nb_director,
+    listagg(distinct d.name, ', ') as directors
+from 
+    person actor 
+    join play pl on actor.id = pl.actor_id
+    join movie m on pl.movie_id = m.id
+    join director_selection d on m.director_id = d.id
+group by actor.id, actor.name
+order by nb_director desc
+;
+-- step 3 : garder que ceux qui ont 4 = nb de real
+with director_selection as (
+    select *
+    from person
+    where name in (
+        'Clint Eastwood',
+        'Steven Spielberg',
+        'Quentin Tarantino',
+        'Martin Scorsese',
+        'Danny Boyle'
+    )
+)
+select
+    actor.id,
+    actor.name,
+    count(distinct d.id) as nb_director,
+    listagg(distinct d.name, ', ') as directors
+from 
+    person actor 
+    join play pl on actor.id = pl.actor_id
+    join movie m on pl.movie_id = m.id
+    join director_selection d on m.director_id = d.id
+group by actor.id, actor.name
+having count(distinct d.id) = (
+    select count(*) from director_selection
+)
+order by nb_director desc
+;
+
+
+
+
+-- solution 2 = double negative (not exists)
+with director_selection as (
+    select *
+    from person
+    where name in (
+        'Clint Eastwood',
+        'Steven Spielberg',
+        'Quentin Tarantino',
+        'Martin Scorsese',
+        'Danny Boyle'
+    )
+)
+select *
+from person person_actor
+where not exists (
+    select * from director_selection person_director
+    where not exists (
+        select *
+        from 
+            play pl
+            join movie m on pl.movie_id = m.id
+        where
+            person_actor.id = pl.actor_id
+            and person_director.id = m.director_id
+    )
+);
 
 
 
@@ -413,16 +805,6 @@ select * from V_ACTOR_STATS order by nb_movie desc;
 
 
 
-
-
-
-
-
-
-
-
-
---   * nombre d'acteurs ayant collaboré avec [query réalisateur]
 
 
 
